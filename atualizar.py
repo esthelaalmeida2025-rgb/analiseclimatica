@@ -16,8 +16,12 @@ import argparse, glob, io, json, os, re, sys, time, zipfile, datetime as dt
 import urllib.request
 import pandas as pd, numpy as np
 
-RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BUILD = os.path.join(RAIZ, 'build'); DADOS = os.path.join(RAIZ, 'dados'); DOCS = os.path.join(RAIZ, 'docs')
+AQUI = os.path.dirname(os.path.abspath(__file__))
+# Aceita duas organizações: build/ + dados/ (padrão) ou tudo na raiz do repositório.
+RAIZ = os.path.dirname(AQUI) if os.path.basename(AQUI) == 'build' else AQUI
+BUILD = AQUI
+DADOS = os.path.join(RAIZ, 'dados') if os.path.basename(AQUI) == 'build' else RAIZ
+DOCS = os.path.join(RAIZ, 'docs')
 ANO_INICIAL = 2020
 URL = 'https://portal.inmet.gov.br/uploads/dadoshistoricos/{ano}.zip'
 UF = 'SE_SP'
@@ -170,10 +174,14 @@ def montar_html(anos_ok, anos_faltantes):
     t = open(os.path.join(BUILD, 'painel_template.html'), encoding='utf-8').read()
     libs = ''
     for f in ['chart.umd.js', 'html2canvas.min.js', 'jspdf.umd.min.js']:
-        libs += '<script>' + open(os.path.join(BUILD, 'libs', f), encoding='utf-8').read().replace('</script>', '<\\/script>') + '</script>\n'
+        cam = os.path.join(BUILD, 'libs', f)
+        if not os.path.exists(cam):
+            cam = os.path.join(BUILD, f)
+        libs += '<script>' + open(cam, encoding='utf-8').read().replace('</script>', '<\\/script>') + '</script>\n'
     t = t.replace('__LIBS__', libs)
     t = t.replace('__DATA__', json.dumps(data, ensure_ascii=False, separators=(',', ':')))
     t = t.replace('__SP__', open(os.path.join(BUILD, 'sp.json'), encoding='utf-8').read())
+    t = t.replace('__APT__', open(os.path.join(BUILD, 'aptidao.json'), encoding='utf-8').read())
     os.makedirs(DOCS, exist_ok=True)
     open(os.path.join(DOCS, 'index.html'), 'w', encoding='utf-8').write(t)
     # CSV mensal consolidado
