@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel Climático INMET · São Paulo 2020–2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+__LIBS__
+<style>
+:root{
+  --verde:#0B4D40; --verde-2:#166B59; --verde-3:#2E8A72; --verde-claro:#DCEBE3;
+  --creme:#F2E9CE; --creme-2:#F8F3E3; --papel:#FCFAF4; --tinta:#1F2A26; --cinza:#6F7A75; --linha:#E3DCC6;
+  --chuva:#2E7DA1; --chuva-2:#8FC1D6; --quente:#C8553D; --frio:#5B8FB9; --umid:#4E9F8A; --rad:#D99A26; --vento:#7B7F6A; --geada:#7A9CC6;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--papel);color:var(--tinta);font-family:'Manrope',system-ui,sans-serif;font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+button,select,input,textarea{font-family:inherit;font-size:inherit}
+h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.01em}
+a{color:var(--verde)}
+.topo{background:var(--verde);color:var(--creme);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.topo .marca{display:flex;align-items:center;gap:16px}
+.topo .logo{width:46px;height:46px;border:2px solid var(--creme);border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:15px;letter-spacing:.04em}
+.topo h1{font-size:20px;font-weight:800}
+.topo .sub{font-size:12.5px;opacity:.85;margin-top:2px}
+.topo .acoes{display:flex;gap:10px;flex-wrap:wrap}
+.btn{border:1.5px solid var(--creme);background:transparent;color:var(--creme);padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600;transition:background .15s}
+.btn:hover{background:rgba(242,233,206,.14)}
+.btn.cheio{background:var(--creme);color:var(--verde)}
+.btn.cheio:hover{background:#fff}
+.btn:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--rad);outline-offset:2px}
+
+.filtros{position:sticky;top:0;z-index:20;background:var(--creme);border-bottom:1px solid var(--linha);padding:12px 28px;display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end}
+.campo{display:flex;flex-direction:column;gap:4px;min-width:150px}
+.campo label{font-size:11.5px;font-weight:600;color:var(--verde)}
+.campo select,.campo input{border:1px solid #D6CCAA;background:#fff;border-radius:7px;padding:7px 9px;color:var(--tinta)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1.5px solid var(--verde-3);background:#fff;color:var(--verde);border-radius:999px;padding:4px 11px;cursor:pointer;font-weight:600;font-size:12.5px;user-select:none}
+.chip.on{background:var(--verde);border-color:var(--verde);color:var(--creme)}
+.chip.mini{padding:3px 9px;font-size:12px}
+.filtros .resumo{margin-left:auto;font-size:12px;color:var(--cinza);max-width:360px;text-align:right}
+
+.abas{display:flex;gap:2px;padding:0 28px;background:var(--papel);border-bottom:1px solid var(--linha)}
+.aba{padding:12px 16px;border:0;background:transparent;color:var(--cinza);font-weight:600;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
+.aba.on{color:var(--verde);border-bottom-color:var(--verde)}
+main{padding:22px 28px 60px;max-width:1440px;margin:0 auto}
+.painel{display:none}
+.painel.on{display:block}
+.secao{background:#fff;border:1px solid var(--linha);border-radius:12px;padding:18px 20px;margin-bottom:18px}
+.secao h2{font-size:16px;color:var(--verde);margin-bottom:4px}
+.secao .desc{font-size:12.5px;color:var(--cinza);margin-bottom:14px}
+.grade{display:grid;gap:18px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:980px){.g2,.g3{grid-template-columns:1fr}}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpi{background:var(--creme-2);border-left:4px solid var(--verde);border-radius:8px;padding:12px 14px}
+.kpi .rot{font-size:11.5px;color:var(--cinza);font-weight:600}
+.kpi .val{font-size:26px;font-weight:800;color:var(--verde);margin-top:2px;line-height:1.1}
+.kpi .val small{font-size:12px;font-weight:600;color:var(--cinza);margin-left:3px}
+.kpi .delta{font-size:12px;margin-top:4px;font-weight:600}
+.delta.mais{color:var(--quente)}.delta.menos{color:var(--chuva)}.delta.neutro{color:var(--cinza)}
+.kpi.chuva{border-left-color:var(--chuva)}.kpi.quente{border-left-color:var(--quente)}.kpi.frio{border-left-color:var(--frio)}.kpi.rad{border-left-color:var(--rad)}.kpi.umid{border-left-color:var(--umid)}.kpi.geada{border-left-color:var(--geada)}
+
+.graf{position:relative;height:340px}
+.graf.alto{height:420px}
+.graf.baixo{height:260px}
+.controles{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.controles .campo{min-width:120px}
+.seg{display:inline-flex;border:1px solid var(--verde-3);border-radius:7px;overflow:hidden}
+.seg button{border:0;background:#fff;color:var(--verde);padding:6px 11px;cursor:pointer;font-weight:600}
+.seg button.on{background:var(--verde);color:var(--creme)}
+
+table.calor{border-collapse:collapse;width:100%;font-size:12.5px}
+table.calor th,table.calor td{padding:6px 8px;text-align:right;border-bottom:1px solid #EEE9D8}
+table.calor th{color:var(--verde);font-weight:700;background:var(--creme-2);position:sticky;top:0}
+table.calor td:first-child,table.calor th:first-child{text-align:left;font-weight:600}
+table.calor td.med{font-weight:700;border-left:2px solid var(--linha)}
+.rolagem{overflow:auto;max-height:520px}
+
+.mapa-wrap{display:grid;grid-template-columns:1fr 300px;gap:18px}
+@media(max-width:980px){.mapa-wrap{grid-template-columns:1fr}}
+.mapa-canvas{position:relative;background:var(--creme-2);border-radius:10px;border:1px solid var(--linha);overflow:hidden}
+.mapa-canvas canvas{display:block;width:100%;height:auto}
+.mapa-canvas .tip{position:absolute;pointer-events:none;background:var(--verde);color:var(--creme);padding:6px 9px;border-radius:6px;font-size:12px;white-space:nowrap;display:none;transform:translate(-50%,-125%)}
+.legenda{display:flex;flex-direction:column;gap:6px;font-size:12px}
+.legenda .barra{height:14px;border-radius:4px;border:1px solid var(--linha)}
+.legenda .ext{display:flex;justify-content:space-between;color:var(--cinza)}
+.lista-est{font-size:12px;max-height:380px;overflow:auto;border:1px solid var(--linha);border-radius:8px}
+.lista-est div{display:flex;justify-content:space-between;padding:4px 9px;border-bottom:1px solid #F0EBDD}
+.lista-est div:hover{background:var(--creme-2)}
+.lista-est b{color:var(--verde)}
+
+textarea{width:100%;min-height:120px;border:1px solid #D6CCAA;border-radius:8px;padding:10px;resize:vertical;background:#fff}
+.nota{font-size:12px;color:var(--cinza)}
+.aviso{background:var(--creme-2);border-left:4px solid var(--rad);padding:10px 12px;border-radius:6px;font-size:12.5px;margin-bottom:16px}
+.rodape{text-align:center;color:var(--cinza);font-size:12px;padding:20px}
+#pdf-modal{position:fixed;inset:0;background:rgba(11,77,64,.55);display:none;place-items:center;z-index:50}
+#pdf-modal .cx{background:#fff;border-radius:12px;padding:22px;width:min(520px,92vw)}
+#pdf-modal h3{color:var(--verde);margin-bottom:8px}
+#pdf-modal .ops{display:flex;flex-direction:column;gap:8px;margin:12px 0 16px}
+#pdf-modal label{display:flex;gap:8px;align-items:center;cursor:pointer}
+#pdf-modal .acoes{display:flex;justify-content:flex-end;gap:10px}
+#pdf-modal .btn{border-color:var(--verde);color:var(--verde)}
+#pdf-modal .btn.cheio{background:var(--verde);color:var(--creme)}
+#progresso{font-size:12px;color:var(--cinza);min-height:16px}
+.print-only{display:none}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="topo">
+  <div class="marca">
+    <div class="logo">SP</div>
+    <div>
+      <h1>Painel Climático INMET · Estado de São Paulo</h1>
+      <div class="sub" id="sub-periodo">Estações automáticas do INMET</div>
+    </div>
+  </div>
+  <div class="acoes">
+    <button class="btn" id="btn-csv">Exportar tabela (CSV)</button>
+    <button class="btn cheio" id="btn-pdf">Gerar PDF da análise</button>
+  </div>
+</header>
+
+<div class="filtros">
+  <div class="campo" style="min-width:230px">
+    <label for="sel-est">Estação (ou grupo)</label>
+    <select id="sel-est"></select>
+  </div>
+  <div class="campo" style="min-width:210px">
+    <label for="sel-var">Variável</label>
+    <select id="sel-var"></select>
+  </div>
+  <div class="campo">
+    <label>Anos comparados</label>
+    <div class="chips" id="chips-anos"></div>
+  </div>
+  <div class="campo">
+    <label>Período do ano</label>
+    <div class="chips" id="chips-per">
+      <span class="chip mini on" data-p="ano">Ano todo</span>
+      <span class="chip mini" data-p="chuvoso">Out–Mar (chuvoso)</span>
+      <span class="chip mini" data-p="seco">Abr–Set (seco)</span>
+      <span class="chip mini" data-p="custom">Personalizado</span>
+    </div>
+  </div>
+  <div class="campo" id="campo-custom" style="display:none">
+    <label>Meses (de – até)</label>
+    <div style="display:flex;gap:6px"><select id="mes-ini"></select><select id="mes-fim"></select></div>
+  </div>
+  <div class="resumo" id="resumo-filtro"></div>
+</div>
+
+<nav class="abas">
+  <button class="aba on" data-aba="visao">Visão geral</button>
+  <button class="aba" data-aba="mensal">Comparativo mensal</button>
+  <button class="aba" data-aba="serie">Série temporal e diário</button>
+  <button class="aba" data-aba="espacial">Mapa espacial</button>
+  <button class="aba" data-aba="ranking">Ranking de estações</button>
+  <button class="aba" data-aba="notas">Análise e PDF</button>
+</nav>
+
+<main>
+<!-- VISÃO GERAL -->
+<section class="painel on" id="aba-visao">
+  <div class="secao" id="sec-kpi">
+    <h2 id="kpi-titulo">Indicadores do período</h2>
+    <div class="desc" id="kpi-desc"></div>
+    <div class="kpis" id="kpis"></div>
+    <div class="nota" style="margin-top:10px">Deltas comparam o ano em foco (último ano selecionado) com a média dos demais anos disponíveis para o mesmo período e estação. Quando o ano está incompleto, o intervalo de meses usado aparece no rótulo e a referência é calculada nos mesmos meses.</div>
+  </div>
+  <div class="grade g2">
+    <div class="secao" id="sec-vg1">
+      <h2>Chuva acumulada por mês</h2>
+      <div class="desc">Ano em foco em barras; média dos outros anos em linha tracejada.</div>
+      <div class="graf"><canvas id="g-vg-chuva"></canvas></div>
+    </div>
+    <div class="secao" id="sec-vg2">
+      <h2>Temperaturas por mês</h2>
+      <div class="desc">Máxima média, média e mínima média do ano em foco; faixa histórica sombreada.</div>
+      <div class="graf"><canvas id="g-vg-temp"></canvas></div>
+    </div>
+  </div>
+  <div class="grade g2">
+    <div class="secao" id="sec-vg3">
+      <h2>Dias de chuva, geada e calor</h2>
+      <div class="desc">Contagem mensal no ano em foco: dias com ≥1 mm, mínima ≤3 °C (risco de geada) e máxima ≥32 °C.</div>
+      <div class="graf"><canvas id="g-vg-dias"></canvas></div>
+    </div>
+    <div class="secao" id="sec-vg4">
+      <h2>Umidade e radiação</h2>
+      <div class="desc">Umidade relativa média (%) e radiação global média diária (MJ/m²) no ano em foco.</div>
+      <div class="graf"><canvas id="g-vg-umrad"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARATIVO MENSAL -->
+<section class="painel" id="aba-mensal">
+  <div class="secao" id="sec-mensal">
+    <h2 id="mensal-titulo">Comparativo entre meses e anos</h2>
+    <div class="desc">Cada série é um ano selecionado; a linha tracejada é a média de todos os anos disponíveis.</div>
+    <div class="controles">
+      <div class="seg" id="seg-tipo"><button class="on" data-t="bar">Barras</button><button data-t="line">Linhas</button></div>
+      <label style="display:flex;gap:6px;align-items:center;font-size:12.5px"><input type="checkbox" id="chk-acum"> Acumulado no ano (para chuva e contagens)</label>
+    </div>
+    <div class="graf alto"><canvas id="g-mensal"></canvas></div>
+  </div>
+  <div class="secao" id="sec-tabela">
+    <h2>Tabela mês × ano</h2>
+    <div class="desc">Cores do mais baixo ao mais alto na variável. Última coluna: média do período selecionado; última linha: média dos anos. Asterisco = ano com meses faltantes no período (agregado parcial).</div>
+    <div class="rolagem"><table class="calor" id="tab-calor"></table></div>
+  </div>
+</section>
+
+<!-- SÉRIE -->
+<section class="painel" id="aba-serie">
+  <div class="secao" id="sec-serie">
+    <h2 id="serie-titulo">Série mensal completa</h2>
+    <div class="desc">Evolução de jan/2020 a jul/2026 com a média mensal histórica (climatologia do próprio período) como referência.</div>
+    <div class="graf alto"><canvas id="g-serie"></canvas></div>
+  </div>
+  <div class="secao" id="sec-diario">
+    <h2>Detalhe diário de um mês</h2>
+    <div class="desc">Chuva diária em barras e temperaturas máxima/mínima em linhas para a estação selecionada (grupos mostram a média das estações).</div>
+    <div class="controles">
+      <div class="campo"><label for="sel-diario-ano">Ano</label><select id="sel-diario-ano"></select></div>
+      <div class="campo"><label for="sel-diario-mes">Mês</label><select id="sel-diario-mes"></select></div>
+      <div id="diario-resumo" class="nota"></div>
+    </div>
+    <div class="graf"><canvas id="g-diario"></canvas></div>
+  </div>
+</section>
+
+<!-- ESPACIAL -->
+<section class="painel" id="aba-espacial">
+  <div class="secao" id="sec-mapa">
+    <h2 id="mapa-titulo">Distribuição espacial no estado</h2>
+    <div class="desc">Interpolação (IDW) entre as 42 estações do INMET em SP para a variável e o período escolhidos. Círculos são as estações; o tamanho acompanha o valor. Passe o mouse para ver o valor de cada estação.</div>
+    <div class="controles">
+      <div class="campo"><label for="mapa-ano">Ano</label><select id="mapa-ano"></select></div>
+      <div class="campo"><label for="mapa-mes">Mês</label><select id="mapa-mes"></select></div>
+      <div class="seg" id="seg-mapa"><button class="on" data-m="valor">Valor</button><button data-m="anomalia">Anomalia vs. outros anos</button></div>
+      <label style="display:flex;gap:6px;align-items:center;font-size:12.5px"><input type="checkbox" id="chk-rotulos" checked> Nomes das estações</label>
+      <button class="btn" style="border-color:var(--verde);color:var(--verde)" id="btn-mapa-png">Baixar imagem (PNG)</button>
+    </div>
+    <div class="mapa-wrap">
+      <div class="mapa-canvas"><canvas id="mapa" width="900" height="720"></canvas><div class="tip" id="mapa-tip"></div></div>
+      <div>
+        <div class="legenda" id="mapa-legenda"></div>
+        <h3 style="font-size:13px;color:var(--verde);margin:14px 0 6px">Estações (ordem decrescente)</h3>
+        <div class="lista-est" id="mapa-lista"></div>
+      </div>
+    </div>
+  </div>
+  <div class="secao" id="sec-mapa2">
+    <h2>Comparação lado a lado</h2>
+    <div class="desc">Dois mapas da mesma variável em anos diferentes, para o período de filtro escolhido no topo.</div>
+    <div class="controles">
+      <div class="campo"><label for="cmp-ano-a">Ano A</label><select id="cmp-ano-a"></select></div>
+      <div class="campo"><label for="cmp-ano-b">Ano B</label><select id="cmp-ano-b"></select></div>
+    </div>
+    <div class="grade g2">
+      <div class="mapa-canvas"><canvas id="mapa-a" width="900" height="720"></canvas></div>
+      <div class="mapa-canvas"><canvas id="mapa-b" width="900" height="720"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- RANKING -->
+<section class="painel" id="aba-ranking">
+  <div class="secao" id="sec-ranking">
+    <h2 id="ranking-titulo">Ranking das estações</h2>
+    <div class="desc">Valor agregado da variável no período e no ano em foco, para todas as estações do estado. Barras destacadas = estação/grupo selecionado.</div>
+    <div class="graf" style="height:900px"><canvas id="g-ranking"></canvas></div>
+  </div>
+</section>
+
+<!-- NOTAS -->
+<section class="painel" id="aba-notas">
+  <div class="secao">
+    <h2>Análise do analista</h2>
+    <div class="desc">O texto abaixo entra na primeira página do PDF, junto com a descrição dos filtros aplicados. Use para registrar o cenário avaliado, a conclusão e os próximos passos.</div>
+    <div class="campo" style="margin-bottom:10px"><label for="pdf-titulo">Título da análise</label><input id="pdf-titulo" placeholder="Ex.: Cenário hídrico 2026 vs. média — Sudoeste Paulista"></div>
+    <div class="campo" style="margin-bottom:10px"><label for="pdf-autor">Responsável</label><input id="pdf-autor" value="Esthela de Almeida Santos"></div>
+    <textarea id="pdf-notas" placeholder="Contexto, leitura dos gráficos, riscos operacionais (estradas, colheita, transporte), recomendações…"></textarea>
+    <div style="margin-top:12px"><button class="btn cheio" style="background:var(--verde);color:var(--creme);border-color:var(--verde)" id="btn-pdf2">Gerar PDF da análise</button></div>
+  </div>
+  <div class="secao">
+    <h2>Sobre os dados</h2>
+    <div class="nota">
+      Fonte: INMET, dados horários das estações automáticas (BDMEP), 42 estações do estado de São Paulo. Agregação: chuva = soma horária → soma diária → soma mensal; temperaturas = médias diárias e extremos absolutos do mês; umidade e vento = média horária; radiação = soma diária em MJ/m² e média mensal desse total. Dia considerado válido com ≥18 horas de leitura; mês válido com ≥80% dos dias (chuva) ou ≥70% (temperatura). Meses com cobertura insuficiente ficam em branco. Atualização automática semanal a partir de portal.inmet.gov.br/dadoshistoricos. Estações com série curta: Bebedouro e Ourinhos (sem 2025), São Sebastião e Votuporanga (a partir de 2025).
+    </div>
+  </div>
+</section>
+</main>
+<div class="rodape">Painel Climático INMET-SP · dados atualizados em <span id="atualizado"></span> · consultado em <span id="hoje"></span></div>
+
+<div id="pdf-modal">
+  <div class="cx">
+    <h3>Gerar PDF da análise</h3>
+    <div class="nota">Escolha o que entra no relatório. Cada bloco vira uma página A4 paisagem com os filtros atuais.</div>
+    <div class="ops">
+      <label><input type="checkbox" checked data-sec="sec-kpi"> Indicadores do período</label>
+      <label><input type="checkbox" checked data-sec="sec-vg1,sec-vg2"> Chuva e temperatura por mês</label>
+      <label><input type="checkbox" data-sec="sec-vg3,sec-vg4"> Dias de chuva/geada/calor · umidade e radiação</label>
+      <label><input type="checkbox" checked data-sec="sec-mensal"> Comparativo mensal entre anos</label>
+      <label><input type="checkbox" data-sec="sec-tabela"> Tabela mês × ano</label>
+      <label><input type="checkbox" data-sec="sec-serie"> Série mensal completa</label>
+      <label><input type="checkbox" data-sec="sec-diario"> Detalhe diário</label>
+      <label><input type="checkbox" checked data-sec="sec-mapa"> Mapa espacial</label>
+      <label><input type="checkbox" data-sec="sec-mapa2"> Mapas lado a lado</label>
+      <label><input type="checkbox" data-sec="sec-ranking"> Ranking de estações</label>
+    </div>
+    <div id="progresso"></div>
+    <div class="acoes"><button class="btn" id="pdf-cancel">Cancelar</button><button class="btn cheio" id="pdf-go">Gerar</button></div>
+  </div>
+</div>
+
+<script id="dados" type="application/json">__DATA__</script>
+<script id="sp-geo" type="application/json">__SP__</script>
+<script>
+// ============ DADOS ============
+const D = JSON.parse(document.getElementById('dados').textContent);
+const SP = JSON.parse(document.getElementById('sp-geo').textContent);
+const F = D.meta.fields; const FI = Object.fromEntries(F.map((f,i)=>[f,i]));
+const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const MESES_L = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const ANOS = [...new Set(D.meta.months.map(m=>m.slice(0,4)))];
+const EST = D.stations;
+const PAL_ANO=['#9DB4A0','#6E9C8B','#2E8A72','#4E9F8A','#166B59','#0B4D40','#7B7F6A','#5B8FB9'];
+const CORES_ANO = {}; ANOS.forEach((a,i)=>CORES_ANO[a]=i===ANOS.length-1?'#C8553D':i===ANOS.length-2?'#D99A26':PAL_ANO[i%PAL_ANO.length]);
+const VARS = {
+  prec:{rot:'Chuva acumulada',un:'mm',agg:'sum',cor:'var(--chuva)',hex:'#2E7DA1',esc:'chuva',dec:0},
+  dias_chuva:{rot:'Dias com chuva (≥1 mm)',un:'dias',agg:'sum',hex:'#2E7DA1',esc:'chuva',dec:0},
+  pmax_dia:{rot:'Maior chuva em 24 h',un:'mm',agg:'max',hex:'#2E7DA1',esc:'chuva',dec:1},
+  tmed:{rot:'Temperatura média',un:'°C',agg:'mean',hex:'#8C6D46',esc:'temp',dec:1},
+  tmax_med:{rot:'Temperatura máxima média',un:'°C',agg:'mean',hex:'#C8553D',esc:'temp',dec:1},
+  tmin_med:{rot:'Temperatura mínima média',un:'°C',agg:'mean',hex:'#5B8FB9',esc:'temp',dec:1},
+  tmax_abs:{rot:'Máxima absoluta',un:'°C',agg:'max',hex:'#C8553D',esc:'temp',dec:1},
+  tmin_abs:{rot:'Mínima absoluta',un:'°C',agg:'min',hex:'#5B8FB9',esc:'temp',dec:1},
+  dias_geada:{rot:'Dias com risco de geada (Tmín ≤3 °C)',un:'dias',agg:'sum',hex:'#7A9CC6',esc:'frio',dec:0},
+  dias_calor:{rot:'Dias de calor (Tmáx ≥32 °C)',un:'dias',agg:'sum',hex:'#C8553D',esc:'temp',dec:0},
+  umid:{rot:'Umidade relativa média',un:'%',agg:'mean',hex:'#4E9F8A',esc:'umid',dec:0},
+  umin:{rot:'Umidade relativa mínima',un:'%',agg:'min',hex:'#4E9F8A',esc:'umid',dec:0},
+  rad:{rot:'Radiação global (média diária)',un:'MJ/m²',agg:'mean',hex:'#D99A26',esc:'rad',dec:1},
+  vel:{rot:'Vento médio',un:'m/s',agg:'mean',hex:'#7B7F6A',esc:'vento',dec:1},
+  raj:{rot:'Rajada máxima',un:'m/s',agg:'max',hex:'#7B7F6A',esc:'vento',dec:1},
+};
+// grupos regionais (aproximação por coordenadas)
+function regiao(s){
+  const {lat,lon}=s;
+  if(lat<-24.2||(lat<-23.6&&lon>-47.0&&lon<-46.0&&s.code!=='A771'&&s.code!=='A755')) return 'Litoral e Vale do Ribeira';
+  if(lon<-50.3) return 'Oeste paulista';
+  if(lat>-21.6&&lon>-50.3) return 'Norte paulista';
+  if(lon>-46.3) return 'Vale do Paraíba e Mantiqueira';
+  if(lat<-22.9&&lon<-47.4) return 'Sudoeste paulista';
+  if(lat<-23.2) return 'Região metropolitana';
+  return 'Centro paulista';
+}
+EST.forEach(s=>s.reg=regiao(s));
+// fix: coastal ones
+['A765','A712','A766','A746','A767'].forEach(c=>{const s=EST.find(x=>x.code===c); if(s) s.reg='Litoral e Vale do Ribeira';});
+['A701','A771','A755','A744'].forEach(c=>{const s=EST.find(x=>x.code===c); if(s) s.reg='Região metropolitana';});
+const REGS=[...new Set(EST.map(s=>s.reg))].sort();
+const GRUPOS={'Todas as estações (média SP)':EST.map(s=>s.code),'Região de Itapetininga (Itapeva, S. Miguel Arcanjo, Iperó, Avaré)':['A714','A715','A713','A725']};
+REGS.forEach(r=>GRUPOS['Região: '+r]=EST.filter(s=>s.reg===r).map(s=>s.code));
+
+// ============ ESTADO ============
+const S = {est:'A714', var:'prec', anos:ANOS.slice(-3), per:'ano', mi:0, mf:11, tipo:'bar', acum:false, aba:'visao', mapaModo:'valor'};
+const $=id=>document.getElementById(id);
+const fmt=(v,d=1)=>v==null||isNaN(v)?'–':Number(v).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
+
+// ============ HELPERS ============
+function mesesPeriodo(){ if(S.per==='ano') return [...Array(12).keys()]; if(S.per==='seco') return [3,4,5,6,7,8]; if(S.per==='chuvoso') return [9,10,11,0,1,2]; const a=[]; for(let i=S.mi;i<=S.mf;i++) a.push(i); return a; }
+function perTexto(){ return S.per==='ano'?'ano todo':S.per==='seco'?'abr–set':S.per==='chuvoso'?'out–mar (out–dez do ano + jan–mar seguinte)':`${MESES[S.mi]}–${MESES[S.mf]}`; }
+function codigos(){ return GRUPOS[S.est] ? GRUPOS[S.est] : [S.est]; }
+function nomeEst(){ if(GRUPOS[S.est]) return S.est; const s=EST.find(x=>x.code===S.est); return s?`${s.name} (${s.code})`:S.est; }
+// valor mensal de uma estação: v(code, 'YYYY-MM', var)
+function vm(code, ym, v){ const s=EST.find(x=>x.code===code); const r=s&&s.m[ym]; return r?r[FI[v]]:null; }
+// valor mensal agregado de várias estações (média)
+function vmG(codes, ym, v){ const a=codes.map(c=>vm(c,ym,v)).filter(x=>x!=null); return a.length?a.reduce((p,q)=>p+q,0)/a.length:null; }
+// meses (YYYY-MM) do período para um ano; chuvoso cruza ano
+function ymsPeriodo(ano){ const ms=mesesPeriodo(); if(S.per==='chuvoso'){ return ms.map(m=>m>=9?`${ano}-${String(m+1).padStart(2,'0')}`:`${+ano+1}-${String(m+1).padStart(2,'0')}`);} return ms.map(m=>`${ano}-${String(m+1).padStart(2,'0')}`); }
+function agg(vals, tipo){ const a=vals.filter(x=>x!=null); if(!a.length) return null; if(tipo==='sum') return a.reduce((p,q)=>p+q,0); if(tipo==='mean') return a.reduce((p,q)=>p+q,0)/a.length; if(tipo==='max') return Math.max(...a); if(tipo==='min') return Math.min(...a); }
+// agregado do período para um ano
+function vPer(codes, ano, v, soMeses=null){ let yms=ymsPeriodo(ano); if(soMeses) yms=yms.filter(ym=>soMeses.includes(+ym.slice(5)-1)); const vals=yms.map(ym=>vmG(codes,ym,v)); return agg(vals,VARS[v].agg); }
+// meses (0-11) do período com dado disponível para o ano
+function mesesDisp(codes, ano, v){ return ymsPeriodo(ano).filter(ym=>vmG(codes,ym,v)!=null).map(ym=>+ym.slice(5)-1); }
+function parcial(codes, ano, v){ const md=mesesDisp(codes,ano,v); return md.length && md.length<mesesPeriodo().length ? md : null; }
+function anoFoco(){ return S.anos.length?S.anos[S.anos.length-1]:ANOS[ANOS.length-1]; }
+function mediaOutros(codes, v, anoFoco){ const md=parcial(codes,anoFoco,v); const outros=ANOS.filter(a=>a!==anoFoco).map(a=>vPer(codes,a,v,md)).filter(x=>x!=null); return outros.length?outros.reduce((p,q)=>p+q,0)/outros.length:null; }
+// média histórica mensal (climatologia) de um mês (0-11)
+function climMes(codes, m, v, excluir){ const vals=ANOS.filter(a=>a!==excluir).map(a=>vmG(codes,`${a}-${String(m+1).padStart(2,'0')}`,v)).filter(x=>x!=null); return vals.length?vals.reduce((p,q)=>p+q,0)/vals.length:null; }
+function minMaxMes(codes,m,v){ const vals=ANOS.map(a=>vmG(codes,`${a}-${String(m+1).padStart(2,'0')}`,v)).filter(x=>x!=null); return vals.length?[Math.min(...vals),Math.max(...vals)]:[null,null]; }
+
+// ============ UI INIT ============
+function initUI(){
+  const se=$('sel-est');
+  const og1=document.createElement('optgroup'); og1.label='Grupos';
+  Object.keys(GRUPOS).forEach(g=>{const o=document.createElement('option');o.value=g;o.textContent=g;og1.appendChild(o);}); se.appendChild(og1);
+  REGS.forEach(r=>{const og=document.createElement('optgroup'); og.label=r; EST.filter(s=>s.reg===r).forEach(s=>{const o=document.createElement('option');o.value=s.code;o.textContent=`${s.name} (${s.code})`;og.appendChild(o);}); se.appendChild(og);});
+  se.value=S.est;
+  const sv=$('sel-var'); Object.entries(VARS).forEach(([k,v])=>{const o=document.createElement('option');o.value=k;o.textContent=`${v.rot} (${v.un})`;sv.appendChild(o);}); sv.value=S.var;
+  const ca=$('chips-anos'); ANOS.forEach(a=>{const c=document.createElement('span');c.className='chip'+(S.anos.includes(a)?' on':'');c.textContent=a;c.dataset.a=a;c.onclick=()=>{c.classList.toggle('on'); S.anos=[...ca.querySelectorAll('.chip.on')].map(x=>x.dataset.a); if(!S.anos.length){c.classList.add('on');S.anos=[a];} render();}; ca.appendChild(c);});
+  $('chips-per').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{$('chips-per').querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');S.per=c.dataset.p;$('campo-custom').style.display=S.per==='custom'?'':'none';render();});
+  [$('mes-ini'),$('mes-fim')].forEach((s,i)=>{MESES.forEach((m,j)=>{const o=document.createElement('option');o.value=j;o.textContent=m;s.appendChild(o);}); s.value=i?11:0; s.onchange=()=>{S.mi=+$('mes-ini').value;S.mf=+$('mes-fim').value;if(S.mf<S.mi){S.mf=S.mi;$('mes-fim').value=S.mi;}render();};});
+  se.onchange=()=>{S.est=se.value;render();}; sv.onchange=()=>{S.var=sv.value;render();};
+  document.querySelectorAll('.aba').forEach(b=>b.onclick=()=>{document.querySelectorAll('.aba').forEach(x=>x.classList.remove('on'));b.classList.add('on');S.aba=b.dataset.aba;document.querySelectorAll('.painel').forEach(p=>p.classList.toggle('on',p.id==='aba-'+S.aba));render();});
+  $('seg-tipo').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('seg-tipo').querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');S.tipo=b.dataset.t;renderMensal();});
+  $('chk-acum').onchange=e=>{S.acum=e.target.checked;renderMensal();};
+  $('seg-mapa').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('seg-mapa').querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');S.mapaModo=b.dataset.m;renderMapa();});
+  $('chk-rotulos').onchange=()=>{renderMapa();};
+  ['mapa-ano','cmp-ano-a','cmp-ano-b','sel-diario-ano'].forEach(id=>{ANOS.forEach(a=>{const o=document.createElement('option');o.value=a;o.textContent=a;$(id).appendChild(o);});});
+  const UA=ANOS[ANOS.length-1], PA=ANOS[ANOS.length-2]||UA; $('mapa-ano').value=UA; $('cmp-ano-a').value=PA; $('cmp-ano-b').value=UA; $('sel-diario-ano').value=UA;
+  const mm=$('mapa-mes'); const o0=document.createElement('option');o0.value='per';o0.textContent='Período do filtro';mm.appendChild(o0); MESES.forEach((m,j)=>{const o=document.createElement('option');o.value=j;o.textContent=m;mm.appendChild(o);});
+  MESES.forEach((m,j)=>{const o=document.createElement('option');o.value=j;o.textContent=m;$('sel-diario-mes').appendChild(o);}); $('sel-diario-mes').value=+D.meta.months[D.meta.months.length-1].slice(5)-1;
+  ['mapa-ano','mapa-mes'].forEach(id=>$(id).onchange=renderMapa); ['cmp-ano-a','cmp-ano-b'].forEach(id=>$(id).onchange=renderMapasCmp); ['sel-diario-ano','sel-diario-mes'].forEach(id=>$(id).onchange=renderDiario);
+  $('btn-mapa-png').onclick=()=>{const a=document.createElement('a');a.download=`mapa_${S.var}_${$('mapa-ano').value}.png`;a.href=$('mapa').toDataURL('image/png');a.click();};
+  $('btn-pdf').onclick=abrirPDF; $('btn-pdf2').onclick=abrirPDF; $('pdf-cancel').onclick=()=>$('pdf-modal').style.display='none'; $('pdf-go').onclick=gerarPDF;
+  $('btn-csv').onclick=exportCSV;
+  $('hoje').textContent=new Date().toLocaleDateString('pt-BR');
+  $('atualizado').textContent=D.meta.atualizado||'–';
+  const m0=D.meta.months[0], m1=D.meta.months[D.meta.months.length-1]; const fm=ym=>`${MESES_L[+ym.slice(5)-1].slice(0,3)}/${ym.slice(0,4)}`;
+  const falt=(D.meta.anos_faltantes||[]); $('sub-periodo').textContent=`Estações automáticas do INMET, ${fm(m0)} a ${fm(m1)} · ${EST.length} estações de SP${falt.length?` · sem dados para ${falt.join(', ')}`:''}`;
+  Chart.defaults.font.family='Manrope'; Chart.defaults.color='#4B5450'; Chart.defaults.plugins.legend.labels.boxWidth=12; Chart.defaults.plugins.legend.labels.usePointStyle=true;
+}
+
+// ============ RENDER ============
+const CH={};
+function chart(id, cfg){ if(CH[id]) CH[id].destroy(); CH[id]=new Chart($(id).getContext('2d'),cfg); return CH[id]; }
+const gridOpt={color:'#EEE9D8'};
+function render(){
+  const V=VARS[S.var];
+  $('resumo-filtro').textContent=`${nomeEst()} · ${V.rot} · ${S.anos.join(', ')} · ${perTexto()}`;
+  if(S.aba==='visao') renderVisao();
+  if(S.aba==='mensal') renderMensal();
+  if(S.aba==='serie'){renderSerie();renderDiario();}
+  if(S.aba==='espacial'){renderMapa();renderMapasCmp();}
+  if(S.aba==='ranking') renderRanking();
+}
+function renderTudo(){ renderVisao();renderMensal();renderSerie();renderDiario();renderMapa();renderMapasCmp();renderRanking(); }
+
+function kpi(rot,val,un,cls,dec,ref,invert){
+  let d='';
+  if(val!=null&&ref!=null){const diff=val-ref; const pct=ref?diff/Math.abs(ref)*100:null; const sinal=diff>0?'+':''; const cor=Math.abs(pct??diff)<3?'neutro':(diff>0?'mais':'menos'); d=`<div class="delta ${cor}">${sinal}${fmt(diff,dec)} ${un}${pct!=null?` (${sinal}${fmt(pct,0)}%)`:''} vs. média ${fmt(ref,dec)}</div>`;}
+  else if(val!=null) d='<div class="delta neutro">sem referência</div>';
+  return `<div class="kpi ${cls}"><div class="rot">${rot}</div><div class="val">${fmt(val,dec)}<small>${un}</small></div>${d}</div>`;
+}
+function renderVisao(){
+  const codes=codigos(), af=anoFoco();
+  $('kpi-titulo').textContent=`Indicadores · ${nomeEst()} · ${af} · ${perTexto()}`;
+  $('kpi-desc').textContent=`Ano em foco: ${af}. Referência: média dos demais anos disponíveis (${ANOS.filter(a=>a!==af).join(', ')}).`;
+  const k=(v)=>[vPer(codes,af,v), mediaOutros(codes,v,af)];
+  const rows=[['Chuva acumulada','prec','mm','chuva',0],['Dias com chuva','dias_chuva','dias','chuva',0],['Maior chuva em 24 h','pmax_dia','mm','chuva',1],['Temperatura média','tmed','°C','',1],['Máxima absoluta','tmax_abs','°C','quente',1],['Mínima absoluta','tmin_abs','°C','frio',1],['Dias de risco de geada','dias_geada','dias','geada',0],['Dias de calor ≥32 °C','dias_calor','dias','quente',0],['Umidade relativa média','umid','%','umid',0],['Radiação média diária','rad','MJ/m²','rad',1],['Vento médio','vel','m/s','',1],['Rajada máxima','raj','m/s','',1]];
+  $('kpis').innerHTML=rows.map(r=>{const [v,ref]=k(r[1]); const md=parcial(codes,af,r[1]); const rot=md?`${r[0]} (${MESES[md[0]].toLowerCase()}–${MESES[md[md.length-1]].toLowerCase()})`:r[0]; return kpi(rot,v,r[2],r[3],r[4],ref);}).join('');
+  const ms=mesesPeriodo(); const labels=ms.map(m=>MESES[m]); const yms=ymsPeriodo(af);
+  const foco=yms.map(ym=>vmG(codes,ym,'prec')); const clim=ms.map(m=>climMes(codes,m,'prec',af));
+  chart('g-vg-chuva',{type:'bar',data:{labels,datasets:[{label:`Chuva ${af}`,data:foco,backgroundColor:'#2E7DA1',borderRadius:4},{label:'Média outros anos',data:clim,type:'line',borderColor:'#0B4D40',borderDash:[6,4],borderWidth:2,pointRadius:3,pointBackgroundColor:'#0B4D40',tension:.3}]},options:{maintainAspectRatio:false,scales:{y:{grid:gridOpt,title:{display:true,text:'mm'}},x:{grid:{display:false}}},plugins:{legend:{position:'bottom'}}}});
+  const tmax=yms.map(ym=>vmG(codes,ym,'tmax_med')), tmed=yms.map(ym=>vmG(codes,ym,'tmed')), tmin=yms.map(ym=>vmG(codes,ym,'tmin_med'));
+  const bxMax=ms.map(m=>minMaxMes(codes,m,'tmax_med')[1]), bxMin=ms.map(m=>minMaxMes(codes,m,'tmin_med')[0]);
+  chart('g-vg-temp',{type:'line',data:{labels,datasets:[{label:'Faixa histórica (máx das máximas)',data:bxMax,borderColor:'transparent',backgroundColor:'rgba(11,77,64,.08)',fill:'+1',pointRadius:0},{label:'Faixa histórica (mín das mínimas)',data:bxMin,borderColor:'transparent',backgroundColor:'rgba(91,143,185,.10)',pointRadius:0},{label:`Máx. média ${af}`,data:tmax,borderColor:'#C8553D',backgroundColor:'#C8553D',tension:.3,borderWidth:2.5},{label:`Média ${af}`,data:tmed,borderColor:'#0B4D40',backgroundColor:'#0B4D40',tension:.3,borderWidth:2.5},{label:`Mín. média ${af}`,data:tmin,borderColor:'#5B8FB9',backgroundColor:'#5B8FB9',tension:.3,borderWidth:2.5}]},options:{maintainAspectRatio:false,scales:{y:{grid:gridOpt,title:{display:true,text:'°C'}},x:{grid:{display:false}}},plugins:{legend:{position:'bottom',labels:{filter:i=>!i.text.startsWith('Faixa')}}}}});
+  chart('g-vg-dias',{type:'bar',data:{labels,datasets:[{label:'Dias com chuva ≥1 mm',data:yms.map(ym=>vmG(codes,ym,'dias_chuva')),backgroundColor:'#2E7DA1',borderRadius:3},{label:'Dias risco de geada',data:yms.map(ym=>vmG(codes,ym,'dias_geada')),backgroundColor:'#7A9CC6',borderRadius:3},{label:'Dias calor ≥32 °C',data:yms.map(ym=>vmG(codes,ym,'dias_calor')),backgroundColor:'#C8553D',borderRadius:3}]},options:{maintainAspectRatio:false,scales:{y:{grid:gridOpt,title:{display:true,text:'dias'}},x:{grid:{display:false}}},plugins:{legend:{position:'bottom'}}}});
+  chart('g-vg-umrad',{type:'bar',data:{labels,datasets:[{label:'Umidade relativa média (%)',data:yms.map(ym=>vmG(codes,ym,'umid')),backgroundColor:'#4E9F8A',borderRadius:3,yAxisID:'y'},{label:'Radiação (MJ/m²/dia)',data:yms.map(ym=>vmG(codes,ym,'rad')),type:'line',borderColor:'#D99A26',backgroundColor:'#D99A26',tension:.3,borderWidth:2.5,yAxisID:'y2'}]},options:{maintainAspectRatio:false,scales:{y:{grid:gridOpt,min:0,max:100,title:{display:true,text:'%'}},y2:{position:'right',grid:{display:false},title:{display:true,text:'MJ/m²'}},x:{grid:{display:false}}},plugins:{legend:{position:'bottom'}}}});
+}
+
+function renderMensal(){
+  const codes=codigos(), V=VARS[S.var]; const ms=mesesPeriodo(); const labels=ms.map(m=>MESES[m]);
+  $('mensal-titulo').textContent=`${V.rot} (${V.un}) · ${nomeEst()} · comparação ${S.anos.join(' × ')}`;
+  const acumOk=S.acum&&V.agg==='sum';
+  const serie=(ano)=>{const yms=ymsPeriodo(ano); let acc=0; return yms.map(ym=>{const v=vmG(codes,ym,S.var); if(!acumOk) return v; if(v==null) return null; acc+=v; return acc;});};
+  const ds=S.anos.map(a=>({label:a,data:serie(a),backgroundColor:CORES_ANO[a],borderColor:CORES_ANO[a],borderRadius:3,tension:.3,borderWidth:2.5,pointRadius:3}));
+  let acc=0; const clim=ms.map(m=>{const c=climMes(codes,m,S.var,null); if(!acumOk) return c; acc+=c??0; return acc;});
+  ds.push({label:'Média de todos os anos',data:clim,type:'line',borderColor:'#1F2A26',borderDash:[6,4],borderWidth:2,pointRadius:0,tension:.3,fill:false});
+  chart('g-mensal',{type:S.tipo,data:{labels,datasets:ds},options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:{y:{grid:gridOpt,title:{display:true,text:V.un}},x:{grid:{display:false}}},plugins:{legend:{position:'bottom'}}}});
+  // tabela
+  const vals=ANOS.map(a=>ymsPeriodo(a).map(ym=>vmG(codes,ym,S.var)));
+  const flat=vals.flat().filter(x=>x!=null); const lo=Math.min(...flat), hi=Math.max(...flat);
+  const cor=(v)=>{if(v==null) return '';const t=hi>lo?(v-lo)/(hi-lo):.5; return `background:${escalaCor(V.esc,t,.85)}`;};
+  const aggTxt=V.agg==='sum'?'Total':V.agg==='mean'?'Média':V.agg==='max'?'Máx.':'Mín.';
+  let h='<thead><tr><th>Ano</th>'+labels.map(l=>`<th>${l}</th>`).join('')+`<th>${aggTxt} período</th></tr></thead><tbody>`;
+  ANOS.forEach((a,i)=>{const n=vals[i].filter(x=>x!=null).length; const p=n&&n<vals[i].length?'*':''; h+=`<tr><td>${a}</td>`+vals[i].map(v=>`<td style="${cor(v)}">${fmt(v,V.dec)}</td>`).join('')+`<td class="med">${fmt(agg(vals[i],V.agg),V.dec)}${p}</td></tr>`;});
+  h+=`<tr style="font-weight:700;background:#F8F3E3"><td>Média dos anos</td>`+ms.map((m,j)=>`<td>${fmt(agg(vals.map(r=>r[j]),'mean'),V.dec)}</td>`).join('')+`<td class="med">${fmt(agg(ANOS.map((a,i)=>agg(vals[i],V.agg)),'mean'),V.dec)}</td></tr></tbody>`;
+  $('tab-calor').innerHTML=h;
+}
+
+function renderSerie(){
+  const codes=codigos(), V=VARS[S.var];
+  $('serie-titulo').textContent=`${V.rot} (${V.un}) · ${nomeEst()} · série mensal 2020–2026`;
+  const labels=D.meta.months.map(ym=>`${MESES[+ym.slice(5)-1]}/${ym.slice(2,4)}`);
+  const data=D.meta.months.map(ym=>vmG(codes,ym,S.var));
+  const clim=D.meta.months.map(ym=>climMes(codes,+ym.slice(5)-1,S.var,null));
+  const cores=D.meta.months.map(ym=>CORES_ANO[ym.slice(0,4)]);
+  chart('g-serie',{type:'bar',data:{labels,datasets:[{label:V.rot,data,backgroundColor:cores,borderRadius:2},{label:'Média mensal histórica',data:clim,type:'line',borderColor:'#1F2A26',borderDash:[6,4],borderWidth:1.5,pointRadius:0,tension:.3}]},options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:{y:{grid:gridOpt,title:{display:true,text:V.un}},x:{grid:{display:false},ticks:{maxRotation:90,autoSkip:true,maxTicksLimit:34}}},plugins:{legend:{position:'bottom'}}}});
+}
+
+function renderDiario(){
+  const codes=codigos(); const ano=$('sel-diario-ano').value, mes=+$('sel-diario-mes').value;
+  const base=new Date(Date.UTC(2020,0,1)); const d0=Math.round((Date.UTC(+ano,mes,1)-base)/86400000); const nd=new Date(+ano,mes+1,0).getDate();
+  const acc={}; codes.forEach(c=>{const s=EST.find(x=>x.code===c); s.d.forEach(r=>{if(r[0]>=d0&&r[0]<d0+nd){const k=r[0]-d0; (acc[k]=acc[k]||{p:[],mx:[],mn:[]}); if(r[1]!=null)acc[k].p.push(r[1]); if(r[2]!=null)acc[k].mx.push(r[2]); if(r[3]!=null)acc[k].mn.push(r[3]);}});});
+  const labels=[...Array(nd).keys()].map(i=>String(i+1)); const m=(a)=>a&&a.length?a.reduce((p,q)=>p+q,0)/a.length:null;
+  const prec=labels.map((_,i)=>m(acc[i]?.p)), tmax=labels.map((_,i)=>m(acc[i]?.mx)), tmin=labels.map((_,i)=>m(acc[i]?.mn));
+  const tot=agg(prec,'sum'); const nch=prec.filter(p=>p!=null&&p>=1).length;
+  $('diario-resumo').innerHTML=tot==null?'Sem dados diários para este mês.':`<b>${MESES_L[mes]}/${ano}</b>: ${fmt(tot,0)} mm em ${nch} dias de chuva · Tmáx ${fmt(agg(tmax,'max'))} °C · Tmín ${fmt(agg(tmin,'min'))} °C`;
+  chart('g-diario',{type:'bar',data:{labels,datasets:[{label:'Chuva (mm)',data:prec,backgroundColor:'#2E7DA1',borderRadius:2,yAxisID:'y'},{label:'Tmáx (°C)',data:tmax,type:'line',borderColor:'#C8553D',backgroundColor:'#C8553D',tension:.3,borderWidth:2,pointRadius:2,yAxisID:'y2'},{label:'Tmín (°C)',data:tmin,type:'line',borderColor:'#5B8FB9',backgroundColor:'#5B8FB9',tension:.3,borderWidth:2,pointRadius:2,yAxisID:'y2'}]},options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},scales:{y:{grid:gridOpt,title:{display:true,text:'mm'}},y2:{position:'right',grid:{display:false},title:{display:true,text:'°C'}},x:{grid:{display:false},title:{display:true,text:'dia do mês'}}},plugins:{legend:{position:'bottom'}}}});
+}
+
+// ============ RANKING ============
+function renderRanking(){
+  const V=VARS[S.var], af=anoFoco(), sel=codigos();
+  const md=parcial(EST.map(s=>s.code),af,S.var); $('ranking-titulo').textContent=`${V.rot} (${V.un}) · ${af} · ${md?`${MESES[md[0]]}–${MESES[md[md.length-1]]} (dados disponíveis)`:perTexto()} · todas as estações`;
+  const rows=EST.map(s=>({n:`${s.name} (${s.code})`,v:vPer([s.code],af,S.var),on:sel.includes(s.code)})).filter(r=>r.v!=null).sort((a,b)=>b.v-a.v);
+  chart('g-ranking',{type:'bar',data:{labels:rows.map(r=>r.n),datasets:[{label:V.rot,data:rows.map(r=>r.v),backgroundColor:rows.map(r=>r.on?'#D99A26':V.hex),borderRadius:3}]},options:{indexAxis:'y',maintainAspectRatio:false,scales:{x:{grid:gridOpt,title:{display:true,text:V.un}},y:{grid:{display:false},ticks:{autoSkip:false,font:{size:11}}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fmt(c.raw,V.dec)} ${V.un}`}}}}});
+}
+
+// ============ MAPA ============
+const ESCALAS={
+  chuva:['#F8F3E3','#C7DDE6','#8FC1D6','#4E9CBB','#2E7DA1','#0B4D40'],
+  temp:['#F2E9CE','#F5D9A8','#E9A86A','#D4704A','#C8553D','#7A2E1F'],
+  frio:['#F8F3E3','#C9D7E6','#9DB8D4','#7A9CC6','#4E73A6','#2B4A7A'],
+  umid:['#F8F3E3','#CFE3DA','#9ECDBD','#6FB3A0','#4E9F8A','#0B4D40'],
+  rad:['#F8F3E3','#F3E2B2','#EBC46E','#E2AC46','#D99A26','#9A6A0F'],
+  vento:['#F8F3E3','#DDDFD2','#BDBFAC','#9EA18D','#7B7F6A','#4D5040'],
+  anom:['#2E7DA1','#8FC1D6','#F8F3E3','#E9A86A','#C8553D'],
+};
+function hex2rgb(h){return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
+function escalaCor(nome,t,alpha=1){ const st=ESCALAS[nome]; t=Math.max(0,Math.min(1,t)); const x=t*(st.length-1); const i=Math.min(Math.floor(x),st.length-2); const f=x-i; const a=hex2rgb(st[i]),b=hex2rgb(st[i+1]); const c=a.map((v,k)=>Math.round(v+(b[k]-v)*f)); return `rgba(${c[0]},${c[1]},${c[2]},${alpha})`; }
+const BB={lonMin:-53.2,lonMax:-44.0,latMin:-25.4,latMax:-19.7};
+function proj(lon,lat,W,H){ const pad=20; const sx=(W-2*pad)/(BB.lonMax-BB.lonMin), sy=(H-2*pad)/(BB.latMax-BB.latMin); const s=Math.min(sx,sy*1.0); return [pad+(lon-BB.lonMin)*s, pad+(BB.latMax-lat)*s]; }
+function pip(x,y,poly){ let ins=false; for(let i=0,j=poly.length-1;i<poly.length;j=i++){const xi=poly[i][0],yi=poly[i][1],xj=poly[j][0],yj=poly[j][1]; if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi)) ins=!ins;} return ins; }
+let MASK=null; const GS=5;
+function mask(W,H){ if(MASK) return MASK; const pts=SP.map(p=>proj(p[0],p[1],W,H)); const cols=Math.ceil(W/GS), rows=Math.ceil(H/GS); MASK=new Uint8Array(cols*rows); for(let r=0;r<rows;r++)for(let c=0;c<cols;c++) MASK[r*cols+c]=pip(c*GS+GS/2,r*GS+GS/2,pts)?1:0; MASK.cols=cols;MASK.rows=rows;MASK.pts=pts; return MASK; }
+function valoresMapa(ano,mes,modo){ const V=VARS[S.var]; return EST.map(s=>{ let v,ref=null; if(mes==='per'){ v=vPer([s.code],ano,S.var); if(modo==='anomalia') ref=mediaOutros([s.code],S.var,ano);} else { const ym=`${ano}-${String(+mes+1).padStart(2,'0')}`; v=vm(s.code,ym,S.var); if(modo==='anomalia') ref=climMes([s.code],+mes,S.var,ano);} const val=modo==='anomalia'?(v!=null&&ref!=null?v-ref:null):v; return {s,v:val,bruto:v,ref}; }).filter(r=>r.v!=null); }
+function desenharMapa(canvas, pontos, titulo, modo){
+  const W=canvas.width,H=canvas.height,ctx=canvas.getContext('2d'); const V=VARS[S.var]; const M=mask(W,H);
+  ctx.fillStyle='#F8F3E3'; ctx.fillRect(0,0,W,H);
+  if(!pontos.length){ctx.fillStyle='#6F7A75';ctx.font='16px Manrope';ctx.fillText('Sem dados para esta seleção.',30,40);return null;}
+  const vals=pontos.map(p=>p.v); let lo=Math.min(...vals),hi=Math.max(...vals); let esc=V.esc;
+  if(modo==='anomalia'){const m=Math.max(Math.abs(lo),Math.abs(hi))||1; lo=-m;hi=m;esc='anom';}
+  if(hi===lo){hi=lo+1;}
+  const P=pontos.map(p=>{const [x,y]=proj(p.s.lon,p.s.lat,W,H);return {x,y,v:p.v};});
+  // IDW
+  const img=ctx.createImageData(W,H); const dat=img.data;
+  for(let r=0;r<M.rows;r++)for(let c=0;c<M.cols;c++){ if(!M[r*M.cols+c]) continue; const x=c*GS+GS/2,y=r*GS+GS/2; let num=0,den=0,exact=null; for(const p of P){const d2=(p.x-x)**2+(p.y-y)**2; if(d2<1){exact=p.v;break;} const w=1/(d2*d2); num+=w*p.v;den+=w;} const v=exact??num/den; const t=(v-lo)/(hi-lo); const col=escalaCor(esc,t).match(/\d+/g).map(Number);
+    for(let yy=r*GS;yy<Math.min(H,r*GS+GS);yy++)for(let xx=c*GS;xx<Math.min(W,c*GS+GS);xx++){const i=(yy*W+xx)*4;dat[i]=col[0];dat[i+1]=col[1];dat[i+2]=col[2];dat[i+3]=255;} }
+  ctx.putImageData(img,0,0);
+  // contorno
+  ctx.beginPath(); M.pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.closePath(); ctx.strokeStyle='#0B4D40'; ctx.lineWidth=2.2; ctx.stroke();
+  // estações
+  const rot=$('chk-rotulos').checked; ctx.font='600 11px Manrope';
+  P.forEach((p,i)=>{const t=(p.v-lo)/(hi-lo); const rad=5+t*9; ctx.beginPath();ctx.arc(p.x,p.y,rad,0,Math.PI*2); ctx.fillStyle=escalaCor(esc,t); ctx.fill(); ctx.strokeStyle='#0B4D40'; ctx.lineWidth=1.5; ctx.stroke();
+    if(rot){const txt=pontos[i].s.name.replace('Sao Paulo - ','SP ').replace(' Do ',' do ').replace(' De ',' de '); ctx.fillStyle='#1F2A26'; ctx.lineWidth=3; ctx.strokeStyle='rgba(248,243,227,.85)'; ctx.strokeText(txt,p.x+rad+3,p.y+4); ctx.fillText(txt,p.x+rad+3,p.y+4);} });
+  // título
+  ctx.fillStyle='#0B4D40'; ctx.font='800 17px Manrope'; ctx.fillText(titulo,W-ctx.measureText(titulo).width-22,H-58);
+  ctx.font='500 12px Manrope'; ctx.fillStyle='#4B5450'; const sub=`${V.rot} (${V.un})${modo==='anomalia'?' · anomalia vs. média dos outros anos':''}`; ctx.fillText(sub,W-ctx.measureText(sub).width-22,H-40);
+  const fonte='Fonte: INMET'; ctx.fillText(fonte,W-ctx.measureText(fonte).width-22,H-22);
+  // legenda na tela
+  const lx=30,ly=H-50,lw=220,lh=14; for(let i=0;i<lw;i++){ctx.fillStyle=escalaCor(esc,i/lw);ctx.fillRect(lx+i,ly,1,lh);} ctx.strokeStyle='#0B4D40';ctx.lineWidth=1;ctx.strokeRect(lx,ly,lw,lh);
+  ctx.fillStyle='#1F2A26';ctx.font='600 11px Manrope';ctx.fillText(`${modo==='anomalia'&&lo<0?'':''}${fmt(lo,V.dec)}`,lx,ly+28); const hiT=`${modo==='anomalia'?'+':''}${fmt(hi,V.dec)} ${V.un}`; ctx.fillText(hiT,lx+lw-ctx.measureText(hiT).width,ly+28);
+  return {P,lo,hi,esc};
+}
+let MAPA_P=null;
+function renderMapa(){
+  const ano=$('mapa-ano').value, mes=$('mapa-mes').value; const V=VARS[S.var];
+  const mdp=mes==='per'?parcial(EST.map(s=>s.code),ano,S.var):null; const tituloP=mes==='per'?`${ano} · ${mdp?`${MESES[mdp[0]]}–${MESES[mdp[mdp.length-1]]}`:perTexto()}`:`${MESES_L[+mes]} de ${ano}`;
+  $('mapa-titulo').textContent=`${V.rot} · ${tituloP}${S.mapaModo==='anomalia'?' · anomalia':''}`;
+  const pontos=valoresMapa(ano,mes,S.mapaModo); const res=desenharMapa($('mapa'),pontos,tituloP,S.mapaModo); MAPA_P=res?{res,pontos}:null;
+  if(res){ const grad=`linear-gradient(90deg,${ESCALAS[res.esc].join(',')})`; $('mapa-legenda').innerHTML=`<div><b style="color:var(--verde)">${V.rot} (${V.un})</b></div><div class="barra" style="background:${grad}"></div><div class="ext"><span>${fmt(res.lo,V.dec)}</span><span>${fmt(res.hi,V.dec)}</span></div><div class="nota">${S.mapaModo==='anomalia'?'Azul = abaixo da média dos outros anos; vermelho = acima.':'Do menor ao maior valor observado nesta seleção.'} Interpolação IDW; áreas longe das estações são estimativas.</div>`; }
+  else $('mapa-legenda').innerHTML='<div class="nota">Sem dados.</div>';
+  $('mapa-lista').innerHTML=[...pontos].sort((a,b)=>b.v-a.v).map(p=>`<div><span>${p.s.name} <span style="color:var(--cinza)">${p.s.code}</span></span><b>${S.mapaModo==='anomalia'&&p.v>0?'+':''}${fmt(p.v,V.dec)}</b></div>`).join('');
+}
+$('mapa').addEventListener('mousemove',e=>{ if(!MAPA_P) return; const c=$('mapa'); const r=c.getBoundingClientRect(); const x=(e.clientX-r.left)*c.width/r.width, y=(e.clientY-r.top)*c.height/r.height; let best=null,bd=1e9; MAPA_P.res.P.forEach((p,i)=>{const d=(p.x-x)**2+(p.y-y)**2; if(d<bd){bd=d;best=i;}}); const tip=$('mapa-tip'); if(best!=null&&bd<400){const p=MAPA_P.pontos[best]; const V=VARS[S.var]; tip.style.display='block'; tip.style.left=(e.clientX-r.left)+'px'; tip.style.top=(e.clientY-r.top)+'px'; tip.innerHTML=`<b>${p.s.name}</b> (${p.s.code})<br>${V.rot}: ${fmt(p.bruto,V.dec)} ${V.un}${p.ref!=null?`<br>Média outros anos: ${fmt(p.ref,V.dec)} ${V.un}`:''}`;} else tip.style.display='none'; });
+$('mapa').addEventListener('mouseleave',()=>$('mapa-tip').style.display='none');
+function renderMapasCmp(){ const a=$('cmp-ano-a').value,b=$('cmp-ano-b').value; const V=VARS[S.var];
+  // escala comum
+  const pa=valoresMapa(a,'per','valor'), pb=valoresMapa(b,'per','valor'); const all=[...pa,...pb].map(p=>p.v); if(!all.length){[$('mapa-a'),$('mapa-b')].forEach(c=>desenharMapa(c,[],'', 'valor'));return;}
+  const lo=Math.min(...all),hi=Math.max(...all);
+  const fake=(p)=>[...p,{s:{lon:-99,lat:-99,name:''},v:lo,__f:1},{s:{lon:-99,lat:-99,name:''},v:hi,__f:1}];
+  // draw with common scale by injecting off-map points (projected outside mask/visible area)
+  const tt=(ano)=>{const md=parcial(EST.map(s=>s.code),ano,S.var); return `${ano} · ${md?`${MESES[md[0]]}–${MESES[md[md.length-1]]}`:perTexto()}`;};
+  desenharMapa($('mapa-a'),fake(pa),tt(a),'valor'); desenharMapa($('mapa-b'),fake(pb),tt(b),'valor'); }
+
+// ============ EXPORT ============
+function exportCSV(){ const codes=codigos(),V=VARS[S.var]; let csv='Ano;'+MESES.join(';')+'\n'; ANOS.forEach(a=>{csv+=a+';'+[...Array(12).keys()].map(m=>{const v=vmG(codes,`${a}-${String(m+1).padStart(2,'0')}`,S.var);return v==null?'':String(v.toFixed(V.dec)).replace('.',',');}).join(';')+'\n';}); const b=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}); const u=URL.createObjectURL(b); const l=document.createElement('a'); l.href=u; l.download=`inmet_sp_${S.var}_${nomeEst().replace(/[^\w]+/g,'_')}.csv`; l.click(); }
+function abrirPDF(){ $('pdf-modal').style.display='grid'; $('progresso').textContent=''; }
+async function gerarPDF(){
+  const { jsPDF } = window.jspdf; const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'}); const W=297,H=210; const V=VARS[S.var];
+  const secs=[...$('pdf-modal').querySelectorAll('input[type=checkbox]:checked')].flatMap(c=>c.dataset.sec.split(','));
+  const titulo=$('pdf-titulo').value||`Análise climática · ${nomeEst()}`; const autor=$('pdf-autor').value; const notas=$('pdf-notas').value; const hoje=new Date().toLocaleDateString('pt-BR');
+  const cab=(pg)=>{ pdf.setFillColor(11,77,64); pdf.rect(0,0,W,16,'F'); pdf.setTextColor(242,233,206); pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.text('Painel Climático INMET · São Paulo',10,10.5); pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.text(`${hoje}  ·  pág. ${pg}`,W-10,10.5,{align:'right'}); pdf.setTextColor(111,122,117); pdf.setFontSize(8); pdf.text(`Fonte: INMET (estações automáticas) · Filtros: ${nomeEst()} · ${V.rot} · anos ${S.anos.join(', ')} · ${perTexto()}`,10,H-6); };
+  // capa
+  cab(1); pdf.setTextColor(11,77,64); pdf.setFont('helvetica','bold'); pdf.setFontSize(22); pdf.text(pdf.splitTextToSize(titulo,W-40),20,40);
+  pdf.setFontSize(11); pdf.setFont('helvetica','normal'); pdf.setTextColor(31,42,38); pdf.text(`Responsável: ${autor}`,20,62); pdf.text(`Data: ${hoje}`,20,69);
+  pdf.text(`Estação/grupo: ${nomeEst()}`,20,80); pdf.text(`Variável principal: ${V.rot} (${V.un})`,20,87); pdf.text(`Anos comparados: ${S.anos.join(', ')}  ·  Período: ${perTexto()}  ·  Ano em foco: ${anoFoco()}`,20,94);
+  pdf.setFont('helvetica','bold'); pdf.text('Análise',20,110); pdf.setFont('helvetica','normal'); pdf.setFontSize(10.5);
+  const linhas=pdf.splitTextToSize(notas||'(sem anotações)',W-40); pdf.text(linhas.slice(0,26),20,118);
+  let pg=1;
+  // garantir que as abas estão renderizadas
+  const abaAtual=S.aba; document.querySelectorAll('.painel').forEach(p=>p.classList.add('on')); renderTudo(); await new Promise(r=>setTimeout(r,400));
+  for(const id of secs){ const el=$(id); if(!el) continue; $('progresso').textContent=`Capturando: ${el.querySelector('h2').textContent}…`; const cv=await html2canvas(el,{scale:2,backgroundColor:'#ffffff',useCORS:true}); pdf.addPage(); pg++; cab(pg); const img=cv.toDataURL('image/jpeg',.92); const maxW=W-20,maxH=H-30; let w=maxW,h=cv.height/cv.width*w; if(h>maxH){h=maxH;w=cv.width/cv.height*h;} pdf.addImage(img,'JPEG',(W-w)/2,20,w,h); }
+  document.querySelectorAll('.painel').forEach(p=>p.classList.toggle('on',p.id==='aba-'+abaAtual)); render();
+  pdf.save(`analise_climatica_${nomeEst().replace(/[^\w]+/g,'_')}_${hoje.replace(/\//g,'-')}.pdf`); $('progresso').textContent='PDF gerado.'; setTimeout(()=>$('pdf-modal').style.display='none',800);
+}
+
+initUI(); render();
+</script>
+</body>
+</html>
