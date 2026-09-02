@@ -1,0 +1,27 @@
+name: Atualizar painel INMET-SP
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pandas numpy
+      - run: python build/atualizar.py
+      - name: Publicar
+        run: |
+          git config user.name  "painel-bot"
+          git config user.email "painel-bot@users.noreply.github.com"
+          git add dados docs
+          git diff --cached --quiet || git commit -m "Atualização automática $(date +%d/%m/%Y)"
+          git push
