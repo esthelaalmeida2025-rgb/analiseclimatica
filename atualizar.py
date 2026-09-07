@@ -1,5 +1,5 @@
 """
-Atualiza o Painel Climático INMET-SP.
+Atualiza o Painel Climático INMET · SP e MG.
 
 Uso:
   python build/atualizar.py                 # baixa o que falta + ano corrente, reprocessa e gera docs/index.html
@@ -9,8 +9,10 @@ Uso:
 Regras:
 - Anos de ANO_INICIAL até o ano atual.
 - Um ano só é baixado se não existir dados/mensal_ANO.json, ou se for o ano corrente
-  (o INMET repõe o zip do ano em curso conforme os meses fecham), ou até março para o ano anterior.
-- Só as estações do estado de São Paulo (arquivos INMET_SE_SP_*) são processadas.
+  (o INMET repõe o zip do ano em curso conforme os meses fecham), ou até março para o ano anterior,
+  ou se o arquivo existente ainda for do esquema antigo (sem MG — ver SCHEMA/migração em main()).
+- As estações dos estados configurados em UFS (arquivos INMET_SE_SP_* e INMET_SE_MG_*) são
+  processadas a partir do mesmo zip anual nacional do INMET; cada estação sai marcada com 'uf'.
 """
 import argparse, glob, io, json, os, re, sys, time, zipfile, datetime as dt
 import urllib.request
@@ -24,7 +26,13 @@ DADOS = os.path.join(RAIZ, 'dados') if os.path.basename(AQUI) == 'build' else RA
 DOCS = os.path.join(RAIZ, 'docs')
 ANO_INICIAL = 2020
 URL = 'https://portal.inmet.gov.br/uploads/dadoshistoricos/{ano}.zip'
-UF = 'SE_SP'
+# Estados incluídos no painel e caixa de sanidade (lat_min,lat_max,lon_min,lon_max) para descartar
+# estações claramente mal rotuladas no metadado do INMET. Region prefix: ambos são 'SE' (Sudeste).
+UFS = {
+    'SP': {'prefixo': 'SE_SP', 'bounds': (-26.0, -19.0, -54.0, -43.0)},
+    'MG': {'prefixo': 'SE_MG', 'bounds': (-23.0, -14.0, -52.0, -39.5)},
+}
+SCHEMA = 2  # bump quando o formato de mensal_ANO.json mudar de forma incompatível (força reprocesso)
 COLS = ['data', 'hora', 'prec', 'pres', 'pmax', 'pmin', 'rad', 'temp', 'orv', 'tmax', 'tmin',
         'omax', 'omin', 'umax', 'umin', 'umid', 'vdir', 'raj', 'vel']
 FIELDS = ['prec', 'dias_chuva', 'pmax_dia', 'tmed', 'tmax_med', 'tmin_med', 'tmax_abs', 'tmin_abs',
@@ -52,7 +60,7 @@ def baixar(ano, destino):
     log('ok', os.path.getsize(destino) // 1_000_000, 'MB')
 
 
-def ler_csv(raw):
+def ler_csv(raw, uf, bounds):
     txt = raw.decode('latin1')
     linhas = txt.split('\n')
     meta = {}
@@ -64,11 +72,12 @@ def ler_csv(raw):
         lat = float(meta['LATITUDE'].replace(',', '.')); lon = float(meta['LONGITUDE'].replace(',', '.'))
     except Exception:
         return None
-    if lat < -26 or lat > -19 or lon > -43 or lon < -54:   # fora de SP (ex.: estação mal rotulada)
+    lat_min, lat_max, lon_min, lon_max = bounds
+    if lat < lat_min or lat > lat_max or lon > lon_max or lon < lon_min:   # fora do estado (ex.: estação mal rotulada)
         return None
     alt = meta.get('ALTITUDE', '').replace(',', '.')
     st = {'code': meta['CODIGO (WMO)'], 'name': meta['ESTACAO'].title(), 'lat': round(lat, 4), 'lon': round(lon, 4),
-          'alt': float(alt) if alt else None}
+          'alt': float(alt) if alt else None, 'uf': uf}
     df = pd.read_csv(io.StringIO('\n'.join(linhas[8:])), sep=';', dtype=str)
     df = df.iloc[:, :19]; df.columns = COLS
     for c in COLS[2:]:
@@ -95,18 +104,20 @@ def ler_csv(raw):
 
 
 def processar_ano(ano, caminho_zip):
-    """Lê o zip do INMET e devolve {'stations': {...}, 'daily': DataFrame} só de SP."""
+    """Lê o zip nacional do INMET e devolve {'stations': {...}, 'daily': DataFrame} dos estados em UFS."""
     stations, dias = {}, []
     with zipfile.ZipFile(caminho_zip) as z:
-        nomes = [n for n in z.namelist() if f'INMET_{UF}_' in n.upper() and n.upper().endswith('.CSV')]
-        log(ano, ':', len(nomes), 'estações de SP')
-        for n in nomes:
-            r = ler_csv(z.read(n))
-            if r is None:
-                continue
-            st, d = r
-            stations.setdefault(st['code'], st)
-            dias.append(d)
+        todos = z.namelist()
+        for uf, cfg in UFS.items():
+            nomes = [n for n in todos if f"INMET_{cfg['prefixo']}_" in n.upper() and n.upper().endswith('.CSV')]
+            log(ano, ':', len(nomes), f'estações de {uf}')
+            for n in nomes:
+                r = ler_csv(z.read(n), uf, cfg['bounds'])
+                if r is None:
+                    continue
+                st, d = r
+                stations.setdefault(st['code'], st)
+                dias.append(d)
     if not dias:
         return None
     daily = pd.concat(dias).sort_values(['code', 'data']).drop_duplicates(['code', 'data'])
@@ -139,7 +150,7 @@ def processar_ano(ano, caminho_zip):
         return None if pd.isna(x) else round(float(x), n)
 
     base = pd.Timestamp('2020-01-01')
-    out = {'ano': ano, 'gerado': dt.date.today().isoformat(), 'stations': {}}
+    out = {'ano': ano, 'gerado': dt.date.today().isoformat(), 'schema': SCHEMA, 'stations': {}}
     for code, st in stations.items():
         rec = dict(st); rec['m'] = {}; rec['d'] = []
         for row in m[m.code == code].itertuples():
@@ -159,7 +170,7 @@ def montar_html(anos_ok, anos_faltantes):
         j = json.load(open(os.path.join(DADOS, f'mensal_{ano}.json'), encoding='utf-8'))
         for code, rec in j['stations'].items():
             e = est.setdefault(code, {'code': code, 'name': rec['name'], 'lat': rec['lat'], 'lon': rec['lon'],
-                                      'alt': rec['alt'], 'm': {}, 'd': [], '_names': {}})
+                                      'alt': rec['alt'], 'uf': rec.get('uf', 'SP'), 'm': {}, 'd': [], '_names': {}})
             e['_names'][rec['name']] = e['_names'].get(rec['name'], 0) + 1
             e['m'].update(rec['m']); e['d'].extend(rec['d'])
     stations = []
@@ -181,17 +192,19 @@ def montar_html(anos_ok, anos_faltantes):
     t = t.replace('__LIBS__', libs)
     t = t.replace('__DATA__', json.dumps(data, ensure_ascii=False, separators=(',', ':')))
     t = t.replace('__SP__', open(os.path.join(BUILD, 'sp.json'), encoding='utf-8').read())
+    t = t.replace('__MG__', open(os.path.join(BUILD, 'mg.json'), encoding='utf-8').read())
     t = t.replace('__APT__', open(os.path.join(BUILD, 'aptidao.json'), encoding='utf-8').read())
     os.makedirs(DOCS, exist_ok=True)
     open(os.path.join(DOCS, 'index.html'), 'w', encoding='utf-8').write(t)
-    # CSV mensal consolidado
-    with open(os.path.join(DOCS, 'inmet_sp_mensal.csv'), 'w', encoding='utf-8-sig') as f:
-        f.write(';'.join(['codigo', 'estacao', 'lat', 'lon', 'alt', 'ano_mes'] + FIELDS) + '\n')
+    # CSV mensal consolidado (SP + MG)
+    with open(os.path.join(DOCS, 'inmet_sp_mg_mensal.csv'), 'w', encoding='utf-8-sig') as f:
+        f.write(';'.join(['uf', 'codigo', 'estacao', 'lat', 'lon', 'alt', 'ano_mes'] + FIELDS) + '\n')
         for s in stations:
             for ym in sorted(s['m']):
                 vals = ['' if v is None else str(v).replace('.', ',') for v in s['m'][ym]]
-                f.write(';'.join([s['code'], s['name'], str(s['lat']), str(s['lon']), str(s['alt']), ym] + vals) + '\n')
-    log('painel gerado:', os.path.join(DOCS, 'index.html'), '|', len(stations), 'estações |', months[0], 'a', months[-1])
+                f.write(';'.join([s.get('uf', 'SP'), s['code'], s['name'], str(s['lat']), str(s['lon']), str(s['alt']), ym] + vals) + '\n')
+    n_sp = sum(1 for s in stations if s.get('uf', 'SP') == 'SP'); n_mg = sum(1 for s in stations if s.get('uf') == 'MG')
+    log('painel gerado:', os.path.join(DOCS, 'index.html'), f'| {n_sp} estações SP, {n_mg} estações MG |', months[0], 'a', months[-1])
 
 
 def main():
@@ -204,7 +217,15 @@ def main():
     ok, faltantes = [], []
     for ano in anos:
         alvo = os.path.join(DADOS, f'mensal_{ano}.json')
-        precisa = (not os.path.exists(alvo)) or ano in a.forcar or ano == hoje.year or (ano == hoje.year - 1 and hoje.month <= 3)
+        desatualizado = False
+        if os.path.exists(alvo):
+            try:
+                desatualizado = json.load(open(alvo, encoding='utf-8')).get('schema') != SCHEMA
+            except Exception:
+                desatualizado = True
+        precisa = (not os.path.exists(alvo)) or desatualizado or ano in a.forcar or ano == hoje.year or (ano == hoje.year - 1 and hoje.month <= 3)
+        if desatualizado:
+            log(f'{ano}: mensal_{ano}.json em esquema antigo (sem MG) — reprocessando')
         if precisa:
             try:
                 if a.zips:
