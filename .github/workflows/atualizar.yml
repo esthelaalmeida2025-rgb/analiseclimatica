@@ -8,6 +8,11 @@ on:
 permissions:
   contents: write
 
+# duas execuções não se atropelam: a segunda espera a primeira terminar
+concurrency:
+  group: atualizar-painel
+  cancel-in-progress: false
+
 jobs:
   atualizar:
     runs-on: ubuntu-latest
@@ -22,6 +27,41 @@ jobs:
         run: |
           git config user.name  "painel-bot"
           git config user.email "painel-bot@users.noreply.github.com"
+          base=$(git rev-parse HEAD)
+          msg="Atualização automática $(date +%d/%m/%Y)"
+          # os arquivos que alimentam a geração; se um deles mudar durante a
+          # execução, o painel aqui já nasceu velho e não deve ser publicado
+          fontes="atualizar.py painel_template.html aptidao.json solos.json sp.json mg.json previsao.json"
+
           git add mensal_*.json docs
-          git diff --cached --quiet || git commit -m "Atualização automática $(date +%d/%m/%Y)"
-          git push
+          if git diff --cached --quiet; then
+            echo "Nada mudou — nada a publicar."
+            exit 0
+          fi
+          git commit -m "$msg"
+
+          for tentativa in 1 2 3; do
+            if git push; then
+              echo "Publicado (tentativa $tentativa)."
+              exit 0
+            fi
+            echo "Push recusado: o main mudou durante a execução. Verificando o que chegou (tentativa $tentativa)."
+            git fetch origin main
+            entrantes=$(git diff --name-only "$base" origin/main -- $fontes || true)
+            if [ -n "$entrantes" ]; then
+              echo "Mudou arquivo que alimenta a geração:"
+              echo "$entrantes"
+              echo "O painel desta execução foi montado antes dessa mudança — não vou publicá-lo velho."
+              echo "Rode a esteira de novo para gerar com os arquivos atuais."
+              exit 1
+            fi
+            git reset --soft origin/main
+            git add mensal_*.json docs
+            if git diff --cached --quiet; then
+              echo "Depois de reposicionar, não sobrou diferença — nada a publicar."
+              exit 0
+            fi
+            git commit -m "$msg"
+          done
+          echo "Não consegui publicar após 3 tentativas."
+          exit 1
