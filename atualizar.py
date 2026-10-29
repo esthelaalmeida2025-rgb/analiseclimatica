@@ -14,7 +14,7 @@ Regras:
 - As estações dos estados configurados em UFS (arquivos INMET_SE_SP_* e INMET_SE_MG_*) são
   processadas a partir do mesmo zip anual nacional do INMET; cada estação sai marcada com 'uf'.
 """
-import argparse, glob, io, json, os, re, sys, time, zipfile, datetime as dt
+import argparse, glob, io, json, math, os, re, sys, time, zipfile, datetime as dt
 import urllib.request
 import pandas as pd, numpy as np
 
@@ -32,9 +32,11 @@ UFS = {
     'SP': {'prefixo': 'SE_SP', 'bounds': (-26.0, -19.0, -54.0, -43.0)},
     'MG': {'prefixo': 'SE_MG', 'bounds': (-23.0, -14.0, -52.0, -39.5)},
 }
-SCHEMA = 2  # bump quando o formato de mensal_ANO.json mudar de forma incompatível (força reprocesso)
+SCHEMA = 3  # bump quando o formato de mensal_ANO.json mudar de forma incompatível (força reprocesso)
+            # 3: passou a guardar os insumos do índice de incêndio (umidade e vento das 13 h)
 COLS = ['data', 'hora', 'prec', 'pres', 'pmax', 'pmin', 'rad', 'temp', 'orv', 'tmax', 'tmin',
         'omax', 'omin', 'umax', 'umin', 'umid', 'vdir', 'raj', 'vel']
+HORA_FMA_UTC = 16        # 13 h em Brasília; o INMET publica em UTC
 FIELDS = ['prec', 'dias_chuva', 'pmax_dia', 'tmed', 'tmax_med', 'tmin_med', 'tmax_abs', 'tmin_abs',
           'umid', 'umin', 'rad', 'vel', 'raj', 'dias_geada', 'dias_calor', 'cob_prec', 'cob_temp']
 
@@ -91,6 +93,9 @@ def ler_csv(raw, uf, bounds):
     df.loc[(df.rad < 0) | (df.rad > 5000), 'rad'] = np.nan
     df.loc[(df.vel < 0) | (df.vel > 40), 'vel'] = np.nan
     df.loc[(df.raj < 0) | (df.raj > 60), 'raj'] = np.nan
+    # leitura das 13 h locais (16 UTC), usada no índice de risco de incêndio
+    hh = df['hora'].astype(str).str.extract(r'(\d{1,2})')[0].astype(float)
+    d13 = df[hh == HORA_FMA_UTC].groupby('data').agg(umid13=('umid', 'mean'), vel13=('vel', 'mean'))
     g = df.groupby('data')
     d = pd.DataFrame({
         'prec': g['prec'].sum(min_count=1), 'nprec': g['prec'].count(),
@@ -99,6 +104,7 @@ def ler_csv(raw, uf, bounds):
         'rad': g['rad'].sum(min_count=1) / 1000.0, 'nrad': g['rad'].count(),
         'vel': g['vel'].mean(), 'raj': g['raj'].max(), 'ntemp': g['temp'].count(),
     }).reset_index()
+    d = d.merge(d13, on='data', how='left')
     d['code'] = st['code']
     return st, d
 
@@ -158,10 +164,55 @@ def processar_ano(ano, caminho_zip):
                                 r(row.tmin_med), r(row.tmax_abs), r(row.tmin_abs), r(row.umid, 0), r(row.umin, 0),
                                 r(row.rad), r(row.vel), r(row.raj), r(row.dias_geada, 0), r(row.dias_calor, 0),
                                 r(row.cob_prec, 0), r(row.cob_temp, 0)]
+        rec['f'] = []
         for row in daily[daily.code == code].itertuples():
-            rec['d'].append([int((row.data - base).days), r(row.prec), r(row.tmax), r(row.tmin), r(row.tmed)])
+            dia = int((row.data - base).days)
+            rec['d'].append([dia, r(row.prec), r(row.tmax), r(row.tmin), r(row.tmed)])
+            u13 = getattr(row, 'umid13', np.nan)
+            if not pd.isna(u13):
+                rec['f'].append([dia, r(u13, 0), r(getattr(row, 'vel13', np.nan), 1), r(row.prec)])
         out['stations'][code] = rec
     return out
+
+
+def calcular_fma(insumos):
+    """Fórmula de Monte Alegre (FMA) e sua versão com vento (FMA+), acumuladas dia a dia.
+
+    insumos: lista [dia, umidade_13h (%), vento_13h (m/s), chuva_do_dia (mm)], em ordem.
+    Devolve [dia, FMA, FMA+]. A restrição por chuva segue Soares: até 2,4 mm não altera;
+    2,5 a 4,9 abate 30% do acumulado; 5,0 a 9,9 abate 60%; 10,0 a 12,9 abate 80%;
+    acima de 12,9 zera e o dia não soma. Dia sem leitura das 13 h interrompe a soma
+    (entra como None) e o acumulado segue de onde parou.
+    """
+    fma = fmap = 0.0
+    saida = []
+    for dia, umid, vel, prec in sorted(insumos, key=lambda x: x[0]):
+        if prec is not None:
+            if prec > 12.9:
+                fma = fmap = 0.0
+                saida.append([dia, round(fma, 2), round(fmap, 2)])
+                continue
+            for lim, fator in ((10.0, 0.20), (5.0, 0.40), (2.5, 0.70)):
+                if prec >= lim:
+                    fma *= fator; fmap *= fator
+                    break
+        if umid is None or umid <= 0:
+            saida.append([dia, None, None])
+            continue
+        termo = 100.0 / float(umid)
+        fma += termo
+        fmap += termo * math.exp(0.04 * float(vel or 0.0))
+        saida.append([dia, round(fma, 2), round(fmap, 2)])
+    return saida
+
+
+def ler_opcional(nome, padrao):
+    """Lê um JSON auxiliar do repositório; se não existir, devolve o conteúdo padrão."""
+    caminho = os.path.join(BUILD, nome)
+    if os.path.exists(caminho):
+        return open(caminho, encoding='utf-8').read()
+    log('aviso:', nome, 'não encontrado — a aba correspondente fica vazia')
+    return padrao
 
 
 def montar_html(anos_ok, anos_faltantes):
@@ -170,13 +221,16 @@ def montar_html(anos_ok, anos_faltantes):
         j = json.load(open(os.path.join(DADOS, f'mensal_{ano}.json'), encoding='utf-8'))
         for code, rec in j['stations'].items():
             e = est.setdefault(code, {'code': code, 'name': rec['name'], 'lat': rec['lat'], 'lon': rec['lon'],
-                                      'alt': rec['alt'], 'uf': rec.get('uf', 'SP'), 'm': {}, 'd': [], '_names': {}})
+                                      'alt': rec['alt'], 'uf': rec.get('uf', 'SP'), 'm': {}, 'd': [], '_f': [], '_names': {}})
             e['_names'][rec['name']] = e['_names'].get(rec['name'], 0) + 1
-            e['m'].update(rec['m']); e['d'].extend(rec['d'])
+            e['m'].update(rec['m']); e['d'].extend(rec['d']); e.setdefault('_f', []).extend(rec.get('f', []))
     stations = []
     for e in est.values():
         e['name'] = max(e['_names'], key=e['_names'].get); del e['_names']
-        e['d'].sort(key=lambda x: x[0]); stations.append(e)
+        e['d'].sort(key=lambda x: x[0])
+        ins = sorted({tuple(x) for x in e.pop('_f', [])})
+        e['fma'] = calcular_fma([list(x) for x in ins]) if ins else None
+        stations.append(e)
     stations.sort(key=lambda s: s['name'])
     months = sorted({ym for s in stations for ym in s['m']})
     data = {'meta': {'months': months, 'fields': FIELDS, 'daily_fields': ['dia', 'prec', 'tmax', 'tmin', 'tmed'],
@@ -194,6 +248,8 @@ def montar_html(anos_ok, anos_faltantes):
     t = t.replace('__SP__', open(os.path.join(BUILD, 'sp.json'), encoding='utf-8').read())
     t = t.replace('__MG__', open(os.path.join(BUILD, 'mg.json'), encoding='utf-8').read())
     t = t.replace('__APT__', open(os.path.join(BUILD, 'aptidao.json'), encoding='utf-8').read())
+    t = t.replace('__SOLOS__', ler_opcional('solos.json', '{}'))
+    t = t.replace('__PREV__', ler_opcional('previsao.json', '{"meta":null,"estacoes":{}}'))
     os.makedirs(DOCS, exist_ok=True)
     open(os.path.join(DOCS, 'index.html'), 'w', encoding='utf-8').write(t)
     # CSV mensal consolidado (SP + MG)
@@ -225,7 +281,7 @@ def main():
                 desatualizado = True
         precisa = (not os.path.exists(alvo)) or desatualizado or ano in a.forcar or ano == hoje.year or (ano == hoje.year - 1 and hoje.month <= 3)
         if desatualizado:
-            log(f'{ano}: mensal_{ano}.json em esquema antigo (sem MG) — reprocessando')
+            log(f'{ano}: mensal_{ano}.json em esquema antigo — reprocessando')
         if precisa:
             try:
                 if a.zips:
