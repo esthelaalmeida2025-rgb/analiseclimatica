@@ -456,6 +456,9 @@ a{color:var(--verde)}
 .topo .marca{display:flex;align-items:center;gap:16px}
 .topo .logo{width:46px;height:46px;border:2px solid var(--creme);border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:15px;letter-spacing:.04em}
 .topo h1{font-size:20px;font-weight:800}
+.raio-i{width:.30em;height:.70em;display:inline-block;vertical-align:baseline;position:relative;top:.02em;margin:0 .03em}
+.raio-i{filter:drop-shadow(0 0 4px rgba(217,154,38,.55))}
+.raio-i path{fill:#D99A26}
 .topo .sub{font-size:12.5px;opacity:.85;margin-top:2px}
 .topo .acoes{display:flex;gap:10px;flex-wrap:wrap}
 .btn{border:1.5px solid var(--creme);background:transparent;color:var(--creme);padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600;transition:background .15s}
@@ -602,13 +605,15 @@ textarea{width:100%;min-height:120px;border:1px solid #D6CCAA;border-radius:8px;
 .fontes-painel .ref-abnt b{color:inherit;font-weight:700}
 .fontes-painel .fontes-nota{font-size:12px;line-height:1.5;margin:0 0 16px;color:#627462}
 .referencias-abnt{border-top:1px solid #dae4d8;padding-top:20px}
-</style></head>
+</style>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B4D40'/%3E%3Cpath d='M18.6 4 8.8 18.4h5.9L13.4 28l10.2-14.6h-6.1z' fill='%23D99A26'/%3E%3C/svg%3E">
+</head>
 <body>
 
 <header class="topo">
   <div class="marca">
     <div>
-      <h1 id="titulo-uf">Painel Climático INMET · Estado de São Paulo</h1>
+      <h1 id="titulo-uf" aria-label="Painel Climático INMET">Painel Climático INMET · Estado de São Paulo</h1>
       <div class="sub" id="sub-periodo">Estações automáticas do INMET</div>
     </div>
   </div>
@@ -1158,7 +1163,9 @@ function atualizarAlertaDados(){
 // ============ UI INIT ============
 function atualizarCabecalho(){
   const nome = UF==='MG' ? 'Minas Gerais' : 'São Paulo';
-  const t=$('titulo-uf'); if(t) t.textContent=`Painel Climático INMET · Estado de ${nome}`;
+  const RAIO='<svg class="raio-i" viewBox="0 0 36 72" aria-hidden="true"><path d="M18 0 L2 40 L14 40 L8 72 L34 30 L22 30 L29 0 Z"/></svg>';
+  const t=$('titulo-uf');
+  if(t) t.innerHTML=`Painel Climát${RAIO}co INMET · Estado de ${nome}`;
   const m0=D.meta.months[0], m1=D.meta.months[D.meta.months.length-1];
   const fm=ym=>`${MESES_L[+ym.slice(5)-1].slice(0,3)}/${ym.slice(0,4)}`;
   const falt=(D.meta.anos_faltantes||[]);
